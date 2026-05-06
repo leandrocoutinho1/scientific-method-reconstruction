@@ -6,34 +6,69 @@ INPUT_DIR = Path("data/methods_extracted")
 OUTPUT_DIR = Path("data/gaps")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-REMOVAL_PERCENTAGE = 0.20
+MISSING_TOKEN = "[MISSING_TEXT]"
+MIN_PARAGRAPH_WORDS = 8
 
 
-def create_gap(text: str):
-    words = text.split()
+def select_removable_paragraph(paragraphs: list):
+    candidates = []
 
-    if len(words) < 30:
+    for index, paragraph in enumerate(paragraphs):
+        text = paragraph.get("text", "").strip()
+        word_count = len(text.split())
+
+        if word_count >= MIN_PARAGRAPH_WORDS:
+            candidates.append((index, paragraph))
+
+    if not candidates:
         return None
 
-    gap_size = int(len(words) * REMOVAL_PERCENTAGE)
+    return random.choice(candidates)
 
-    if gap_size <= 0:
+
+def create_paragraph_gap(paragraphs: list):
+    selected = select_removable_paragraph(paragraphs)
+
+    if selected is None:
         return None
 
-    start_index = random.randint(0, len(words) - gap_size)
-    end_index = start_index + gap_size
+    removed_index, removed_paragraph = selected
 
-    removed_excerpt = " ".join(words[start_index:end_index])
+    masked_paragraphs = []
 
-    masked_words = words[:start_index] + ["[MISSING_TEXT]"] + words[end_index:]
+    for index, paragraph in enumerate(paragraphs):
+        if index == removed_index:
+            masked_paragraphs.append(MISSING_TOKEN)
+        else:
+            masked_paragraphs.append(paragraph.get("text", "").strip())
 
-    masked_text = " ".join(masked_words)
+    context_before = "\n\n".join(
+        paragraph.get("text", "").strip()
+        for paragraph in paragraphs[:removed_index]
+    )
+
+    context_after = "\n\n".join(
+        paragraph.get("text", "").strip()
+        for paragraph in paragraphs[removed_index + 1:]
+    )
+
+    original_text = "\n\n".join(
+        paragraph.get("text", "").strip()
+        for paragraph in paragraphs
+    )
+
+    masked_text = "\n\n".join(masked_paragraphs)
 
     return {
+        "mask_strategy": "paragraph",
+        "missing_token": MISSING_TOKEN,
+        "original_text": original_text,
         "masked_text": masked_text,
-        "removed_excerpt": removed_excerpt,
-        "start_index": start_index,
-        "end_index": end_index,
+        "removed_excerpt": removed_paragraph.get("text", "").strip(),
+        "removed_section": removed_paragraph.get("section", ""),
+        "removed_paragraph_index": removed_index,
+        "context_before": context_before,
+        "context_after": context_after,
     }
 
 
@@ -42,22 +77,24 @@ def main():
         with json_file.open("r", encoding="utf-8") as file:
             content = json.load(file)
 
-        method_text = content.get("method_text", "")
+        paragraphs = content.get("paragraphs_clean", [])
 
-        gap_data = create_gap(method_text)
+        if not paragraphs:
+            print(f"Skipping {json_file.name}: no clean methodology paragraphs found.")
+            continue
+
+        gap_data = create_paragraph_gap(paragraphs)
 
         if gap_data is None:
-            print(f"Skipping {json_file.name}: text too small.")
+            print(f"Skipping {json_file.name}: no paragraph large enough to remove.")
             continue
 
         output = {
-            "title": content.get("title", ""),
+            "title": content.get("title_clean", ""),
             "source_file": content.get("source_file", ""),
-            "original_text": method_text,
-            "masked_text": gap_data["masked_text"],
-            "removed_excerpt": gap_data["removed_excerpt"],
-            "start_index": gap_data["start_index"],
-            "end_index": gap_data["end_index"],
+            "method_source_file": json_file.name,
+            "num_original_paragraphs": len(paragraphs),
+            **gap_data,
         }
 
         output_path = OUTPUT_DIR / f"{json_file.stem}_gap.json"
@@ -65,7 +102,11 @@ def main():
         with output_path.open("w", encoding="utf-8") as output_file:
             json.dump(output, output_file, ensure_ascii=False, indent=2)
 
-        print(f"Gap created for {json_file.name}")
+        print(
+            f"Gap created for {json_file.name}: "
+            f"removed paragraph {gap_data['removed_paragraph_index']} "
+            f"from section '{gap_data['removed_section']}'"
+        )
 
 
 if __name__ == "__main__":
