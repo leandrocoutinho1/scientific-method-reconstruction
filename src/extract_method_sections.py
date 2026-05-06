@@ -1,19 +1,32 @@
 import json
-import re
+import unicodedata
 from pathlib import Path
 
 INPUT_DIR = Path("data/grobid_output")
 OUTPUT_DIR = Path("data/methods_extracted")
+CONFIG_PATH = Path("config/section_patterns.json")
+
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-METHOD_SECTION_PATTERNS = [
-    r"\\bmethods?\\b",
-    r"\\bmethodology\\b",
-    r"\\bmaterials and methods\\b",
-    r"\\bexperimental setup\\b",
-    r"\\bexperiments?\\b",
-    r"\\bproposed method\\b",
-    r"\\bapproach\\b",
+
+with CONFIG_PATH.open("r", encoding="utf-8") as config_file:
+    CONFIG = json.load(config_file)
+
+METHOD_SECTION_PATTERNS = CONFIG.get("method_sections", [])
+
+
+def normalize_text(text: str) -> str:
+    text = text.lower().strip()
+
+    return "".join(
+        char for char in unicodedata.normalize("NFD", text)
+        if unicodedata.category(char) != "Mn"
+    )
+
+
+NORMALIZED_PATTERNS = [
+    normalize_text(pattern)
+    for pattern in METHOD_SECTION_PATTERNS
 ]
 
 
@@ -21,11 +34,11 @@ def is_method_section(section_name: str) -> bool:
     if not section_name:
         return False
 
-    section_name = section_name.lower().strip()
+    normalized_section = normalize_text(section_name)
 
     return any(
-        re.search(pattern, section_name)
-        for pattern in METHOD_SECTION_PATTERNS
+        pattern in normalized_section
+        for pattern in NORMALIZED_PATTERNS
     )
 
 
