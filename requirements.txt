@@ -5,6 +5,5 @@ pandas
 numpy
 scikit-learn
 nltk
-spacy
 python-dotenv
 openai
