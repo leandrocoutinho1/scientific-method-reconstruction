@@ -11,16 +11,17 @@ def main():
     client.process(
         service="processFulltextDocument",
         input_path=INPUT_PATH,
-        output_path=OUTPUT_PATH,
+        output=OUTPUT_PATH,
         n=10,
         generateIDs=False,
         consolidate_header=True,
         consolidate_citations=False,
         include_raw_affiliations=False,
         include_raw_citations=False,
-        segmentSentences=True,
-        teiCoordinates=False,
+        segment_sentences=True,
+        tei_coordinates=False,
         json_output=True,
+        force=True,
     )
 
     print("Finished processing PDFs with GROBID.")
