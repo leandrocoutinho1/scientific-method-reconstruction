@@ -1,0 +1,10 @@
+grobid-client-python
+beautifulsoup4
+lxml
+pandas
+numpy
+scikit-learn
+nltk
+spacy
+python-dotenv
+openai
