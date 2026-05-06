@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Environment
+.env
+
+# Jupyter
+.ipynb_checkpoints/
+
+# macOS
+.DS_Store
+
+# Data outputs
+data/raw_pdfs/*.pdf
+data/grobid_output/*
+data/methods_extracted/*
+data/gaps/*
+results/*
+
+# Keep folders
+!data/raw_pdfs/.gitkeep
+!data/grobid_output/.gitkeep
+!data/methods_extracted/.gitkeep
+!data/gaps/.gitkeep
+!results/.gitkeep
