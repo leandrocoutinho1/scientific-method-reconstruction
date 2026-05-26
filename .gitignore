@@ -20,7 +20,7 @@ data/raw_pdfs/*.pdf
 data/grobid_output/*
 data/methods_extracted/*
 data/gaps/*
-results/*
+results/reconstructions/*
 
 # Keep folders
 !data/raw_pdfs/.gitkeep
@@ -28,3 +28,5 @@ results/*
 !data/methods_extracted/.gitkeep
 !data/gaps/.gitkeep
 !results/.gitkeep
+!results/reconstructions/
+!results/reconstructions/.gitkeep
