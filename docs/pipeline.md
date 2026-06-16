@@ -1,31 +1,37 @@
-# Visão geral do pipeline
+# Registro do Pipeline
 
-Este documento descreve o fluxo inicial do protótipo para reconstrução automática de partes faltantes em seções metodológicas de artigos científicos.
+Este documento registra a evolução metodológica do protótipo de reconstrução automática de partes faltantes em seções de metodologia científica.
 
-## Etapa 0 — Iniciar GROBID
-``` bash
-docker run -t --rm -p 8070:8070 lfoppiano/grobid:0.8.2
-```
+O objetivo deste arquivo não é substituir o `README.md`. O `README.md` deve explicar como instalar e executar o projeto. Este documento deve funcionar como histórico de decisões, mudanças de rumo, justificativas técnicas e observações que poderão apoiar a escrita do TCC.
 
-## Etapa 1 — Coleta dos artigos científicos
+## Objetivo do Protótipo
 
-Selecionar um conjunto pequeno de artigos científicos relacionados a aplicações de aprendizado de máquina. Nesta etapa inicial, a recomendação é começar com poucos documentos, por exemplo 10 artigos, para validar o funcionamento do processo antes de expandir o corpus.
+O projeto busca testar a viabilidade de reconstruir trechos ausentes de metodologias científicas usando:
 
-Os arquivos PDF devem ser armazenados em:
+- extração estrutural de artigos com GROBID;
+- identificação automática de seções metodológicas;
+- criação artificial de lacunas;
+- reconstrução do trecho ausente com modelo de linguagem;
+- comparação posterior entre trecho original e trecho reconstruído.
+
+## Estado Atual do Pipeline
+
+O fluxo atual está organizado em quatro scripts numerados:
 
 ```text
-data/raw_pdfs/
+src/1_parse_with_grobid.py
+src/2_extract_method_sections.py
+src/3_create_gaps.py
+src/4_reconstruct_with_groq.py
 ```
 
-## Etapa 2 — Processamento dos PDFs com GROBID
+A numeração foi adotada para deixar explícita a ordem de execução das etapas.
 
-Utilizar o GROBID para converter os PDFs em representações estruturadas, como TEI/XML e JSON. Essa etapa permite obter informações sobre título, autores, resumo, corpo do texto, seções e referências.
+## Etapa 1 — Processamento com GROBID
 
-Script utilizado:
+Decisão atual:
 
-```bash
-python3 src/1_parse_with_grobid.py
-```
+Usar GROBID como ferramenta inicial para converter PDFs científicos em uma estrutura manipulável pelo projeto.
 
 Entrada:
 
@@ -39,28 +45,24 @@ Saída:
 data/grobid_output/
 ```
 
-## Etapa 3 — Extração das seções metodológicas
+Justificativa:
 
-Após o processamento com GROBID, o sistema analisa os arquivos JSON gerados e tenta identificar automaticamente seções relacionadas à metodologia.
+O GROBID já oferece extração estrutural de artigos científicos, incluindo título, corpo do texto, seções e metadados. Isso reduz a necessidade de implementar um parser próprio de PDF nesta fase inicial.
 
-Exemplos de títulos de seção considerados:
+Observação:
 
-- Métodos
-- Metodologia
-- Materiais e Métodos
-- Procedimentos Metodológicos
-- Método Proposto
-- Experimentos
-- Configuração Experimental
-- Methods
-- Methodology
-- Materials and Methods
-- Experimental Setup
+O GROBID precisa estar rodando localmente antes da execução do script.
 
-Script utilizado:
+## Etapa 2 — Extração de Metodologias
 
-```bash
-python3 src/2_extract_method_sections.py
+Decisão atual:
+
+Identificar seções metodológicas a partir dos títulos de seção extraídos pelo GROBID.
+
+Arquivo de padrões:
+
+```text
+config/section_patterns.json
 ```
 
 Entrada:
@@ -75,22 +77,26 @@ Saída:
 data/methods_extracted/
 ```
 
-## Etapa 4 — Criação de lacunas artificiais
+Justificativa:
 
-Depois de extrair as metodologias, o sistema remove artificialmente uma parte do texto para simular um documento incompleto. O trecho removido é armazenado separadamente para permitir comparação posterior com a reconstrução gerada pelo modelo de linguagem.
+Artigos podem nomear a metodologia de formas diferentes, como "Metodologia", "Métodos", "Materiais e Métodos", "Methods", "Experimental Setup" e outras variações. Por isso, os padrões foram externalizados em um arquivo de configuração.
 
-Nesta etapa, a remoção deve ser reprodutível. Por isso, o script utiliza uma semente aleatória fixa por padrão. Nesta versão inicial, os arquivos gerados são mantidos simples para facilitar os primeiros testes com modelo de linguagem.
+Limitação conhecida:
 
-Script utilizado:
+A extração ainda depende bastante da forma como o GROBID identifica os títulos das seções. Quando o GROBID não reconhece corretamente uma seção metodológica, o script pode gerar uma extração vazia.
 
-```bash
-python3 src/3_create_gaps.py
-```
+Decisão de momento:
 
-Também é possível controlar a semente e gerar mais de uma lacuna por documento:
+Aprimorar essa etapa foi considerado importante, mas optamos por seguir primeiro para a reconstrução com LLM para validar o fluxo completo.
 
-```bash
-python3 src/3_create_gaps.py --seed 42 --gaps-per-document 3
+## Etapa 3 — Criação de Lacunas Artificiais
+
+Decisão atual:
+
+Remover propositalmente um parágrafo da metodologia extraída e substituir esse trecho por:
+
+```text
+[MISSING_TEXT]
 ```
 
 Entrada:
@@ -105,52 +111,31 @@ Saída:
 data/gaps/
 ```
 
-Cada arquivo gerado contém:
+Formato atual do arquivo de lacuna:
 
-- identificador da lacuna;
-- título do artigo;
-- texto com a lacuna marcada por `[MISSING_TEXT]`;
-- trecho original removido;
-- seção do trecho removido.
-
-Além dos arquivos individuais, o script gera um manifesto em:
-
-```text
-data/gaps/manifest.json
+```json
+{
+  "gap_id": "...",
+  "title": "...",
+  "masked_text": "... [MISSING_TEXT] ...",
+  "removed_excerpt": "...",
+  "removed_section": "..."
+}
 ```
 
-Esse manifesto registra quais documentos foram processados, quais foram ignorados e quais lacunas foram criadas. Ele deve ser usado posteriormente para organizar a execução dos modelos de linguagem e a análise dos resultados.
+Justificativa:
 
-## Etapa 5 — Reconstrução dos trechos ausentes
+A remoção artificial permite conhecer o trecho original removido. Isso cria uma referência para comparação futura com a reconstrução gerada pelo modelo de linguagem.
 
-Nesta etapa, o texto com a lacuna será enviado a um modelo de linguagem. O modelo deverá gerar uma reconstrução plausível para o trecho marcado como `[MISSING_TEXT]`, considerando o contexto anterior e posterior da metodologia.
+Mudança de rumo registrada:
 
-Nesta primeira versão, a reconstrução utiliza a API da Groq com um prompt de agente especializado em reconstrução de metodologias científicas. O objetivo é manter a etapa simples e controlada: cada arquivo de lacuna em `data/gaps/` gera um arquivo de reconstrução em `results/reconstructions/`.
+Inicialmente, os arquivos de lacuna continham muitos metadados, como contagem de palavras, posição do trecho, contexto anterior e posterior separados e outros detalhes. Para a fase atual, esses campos foram removidos para reduzir ruído e facilitar testes simples.
 
-Antes de executar, crie o arquivo `.env` a partir do exemplo:
+## Etapa 4 — Reconstrução com Groq
 
-```bash
-cp .env.example .env
-```
+Decisão atual:
 
-Depois, preencha:
-
-```text
-GROQ_API_KEY=sua_chave_da_groq
-GROQ_MODEL=llama-3.1-8b-instant
-```
-
-Script utilizado:
-
-```bash
-python3 src/4_reconstruct_with_groq.py
-```
-
-Também é possível limitar a quantidade de lacunas processadas ou informar outro modelo:
-
-```bash
-python3 src/4_reconstruct_with_groq.py --limit 1 --model llama-3.1-8b-instant --seed 42
-```
+Usar a API da Groq para testar uma reconstrução simples com modelo de linguagem.
 
 Entrada:
 
@@ -164,35 +149,56 @@ Saída:
 results/reconstructions/
 ```
 
-Cada arquivo gerado contém:
+Formato atual do arquivo de reconstrução:
 
-- identificador da lacuna;
-- título do artigo;
-- trecho original removido;
-- modelo utilizado;
-- trecho reconstruído.
+```json
+{
+  "gap_id": "...",
+  "title": "...",
+  "removed_excerpt": "...",
+  "model": "...",
+  "reconstructed_excerpt": "..."
+}
+```
 
-## Etapa 6 — Avaliação dos resultados
+Justificativa:
 
-A avaliação será feita comparando o trecho reconstruído com o trecho original removido artificialmente. A análise poderá considerar métricas automáticas e também uma avaliação qualitativa.
+A Groq foi escolhida nesta fase por permitir testar modelos de linguagem de forma simples e acessível. O objetivo atual não é comparar modelos, mas validar o fluxo de reconstrução.
 
-Possíveis critérios de avaliação:
+Mudança de rumo registrada:
 
-- coerência textual;
-- plausibilidade metodológica;
-- aderência ao estilo científico;
-- similaridade com o trecho original;
-- limitações observadas nas reconstruções.
+A primeira versão da reconstrução incluía campos como `confidence`, `notes` e `valid_json_response`. Esses campos foram removidos porque, neste momento, o objetivo é apenas testar a forma básica de reconstrução e comparar o trecho original com o trecho gerado.
 
-## Observações iniciais
+## Decisões de Organização do Código
 
-Durante os testes, é importante registrar:
+Os scripts executáveis do pipeline foram numerados para facilitar a ordem de uso:
 
-- quais PDFs foram processados corretamente;
-- quais artigos tiveram metodologia extraída com sucesso;
-- quais documentos falharam;
-- quais nomes de seção não foram reconhecidos;
-- quais problemas ocorreram na extração do texto;
-- quais ajustes foram necessários nos padrões de busca.
+```text
+1_parse_with_grobid.py
+2_extract_method_sections.py
+3_create_gaps.py
+4_reconstruct_with_groq.py
+```
 
-Essas informações poderão ser utilizadas posteriormente na escrita do capítulo de desenvolvimento e na discussão das limitações do trabalho.
+Os arquivos auxiliares permaneceram sem numeração:
+
+```text
+text_cleaning.py
+utils.py
+```
+
+Justificativa:
+
+A numeração ajuda a entender a sequência experimental. Os arquivos auxiliares não representam etapas executáveis do pipeline e, por isso, foram mantidos sem prefixo numérico.
+
+## Próximos Pontos a Registrar
+
+Este documento deve ser atualizado sempre que houver mudança relevante no rumo do projeto, por exemplo:
+
+- alteração na estratégia de extração das metodologias;
+- troca ou comparação de modelos de linguagem;
+- inclusão de etapa de avaliação automática;
+- inclusão de avaliação qualitativa;
+- mudança no formato dos arquivos intermediários;
+- problemas encontrados durante testes com PDFs reais;
+- decisões tomadas para simplificar ou expandir o escopo.
