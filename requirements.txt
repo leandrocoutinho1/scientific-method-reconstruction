@@ -1,10 +1,10 @@
-grobid-client-python
 beautifulsoup4
+grobid-client-python
 lxml
 pandas
 numpy
 scikit-learn
 nltk
 python-dotenv
+pydantic
 openai
-groq

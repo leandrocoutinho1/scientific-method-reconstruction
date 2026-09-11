@@ -11,7 +11,7 @@ OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 MISSING_TOKEN = "[MISSING_TEXT]"
 DEFAULT_RANDOM_SEED = 42
 DEFAULT_GAPS_PER_DOCUMENT = 1
-MIN_PARAGRAPH_WORDS = 12
+MIN_PARAGRAPH_WORDS = 20
 MAX_REMOVED_TEXT_RATIO = 0.35
 
 
@@ -130,6 +130,9 @@ def main():
         "gaps_per_document": args.gaps_per_document,
         "documents": [],
     }
+
+    for old_output in OUTPUT_DIR.glob("*.json"):
+        old_output.unlink()
 
     for json_file in INPUT_DIR.glob("*.json"):
         with json_file.open("r", encoding="utf-8") as file:

@@ -18,9 +18,11 @@ venv/
 # Data outputs
 data/raw_pdfs/*.pdf
 data/grobid_output/*
+data/pypdf_output/*
 data/methods_extracted/*
 data/gaps/*
 results/reconstructions/*
+results/openrouter_tests/*
 
 # Keep folders
 !data/raw_pdfs/.gitkeep
@@ -30,3 +32,5 @@ results/reconstructions/*
 !results/.gitkeep
 !results/reconstructions/
 !results/reconstructions/.gitkeep
+!results/openrouter_tests/
+!results/openrouter_tests/.gitkeep
