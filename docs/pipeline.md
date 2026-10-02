@@ -575,6 +575,10 @@ Após os primeiros testes com Gemini e OpenRouter, os prompts de reconstrução 
 
 Foi adicionada uma validação com Pydantic para as respostas dos modelos de linguagem. O objetivo é impedir que respostas vazias, JSONs aninhados, textos contendo o marcador `[MISSING_TEXT]` ou saídas fora do schema sejam salvas como reconstruções válidas. A validação foi centralizada em `src/llm_response_schema.py` e passou a ser usada tanto no script do Gemini quanto no script de testes com OpenRouter.
 
+### Registro — 2026-09-11 — Avaliação das Reconstruções por LLMs
+
+Foi criado o passo `src/6_evaluate_reconstructions.py` para avaliar a assertividade das reconstruções já geradas. Nesta etapa, o trecho original removido é usado como referência e a reconstrução é avaliada por dois julgadores: Gemini e um modelo configurável via OpenRouter. A resposta dos avaliadores também é validada com Pydantic e salva em `results/evaluations/`, contendo notas de 1 a 5 para aderência semântica, adequação metodológica, coerência com o contexto, risco de alucinação e nota geral. A decisão por usar dois avaliadores permite comparar se os modelos concordam sobre a qualidade das reconstruções antes de avançar para uma avaliação mais formal.
+
 ## Decisões de Organização do Código
 
 Os scripts executáveis do pipeline foram numerados para facilitar a ordem de uso:
@@ -585,6 +589,7 @@ Os scripts executáveis do pipeline foram numerados para facilitar a ordem de us
 3_create_gaps.py
 4_reconstruct_with_gemini.py
 5_test_openrouter_models.py
+6_evaluate_reconstructions.py
 ```
 
 Os arquivos auxiliares permaneceram sem numeração:

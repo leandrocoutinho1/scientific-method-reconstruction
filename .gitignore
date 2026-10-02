@@ -23,6 +23,7 @@ data/methods_extracted/*
 data/gaps/*
 results/reconstructions/*
 results/openrouter_tests/*
+results/evaluations/*
 
 # Keep folders
 !data/raw_pdfs/.gitkeep
@@ -34,3 +35,5 @@ results/openrouter_tests/*
 !results/reconstructions/.gitkeep
 !results/openrouter_tests/
 !results/openrouter_tests/.gitkeep
+!results/evaluations/
+!results/evaluations/.gitkeep

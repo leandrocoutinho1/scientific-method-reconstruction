@@ -11,6 +11,7 @@ The project currently tests a simple end-to-end flow:
 3. Remove one methodology paragraph on purpose.
 4. Ask Gemini to reconstruct the missing excerpt.
 5. Optionally test OpenRouter models on the same gaps.
+6. Evaluate reconstruction quality with Gemini and OpenRouter as judges.
 
 ## Project Structure
 
@@ -28,12 +29,14 @@ docs/
 results/
   reconstructions/             # LLM reconstruction outputs
   openrouter_tests/            # OpenRouter model test outputs
+  evaluations/                 # LLM evaluation outputs
 src/
   1_parse_with_grobid.py
   2_extract_method_sections.py
   3_create_gaps.py
   4_reconstruct_with_gemini.py
   5_test_openrouter_models.py
+  6_evaluate_reconstructions.py
   llm_response_schema.py
   text_cleaning.py
   utils.py
@@ -57,7 +60,9 @@ cp .env.example .env
 ```env
 gemini-api-key=your_gemini_api_key_here
 gemini-model=gemini-flash-latest
+gemini-evaluator-model=gemini-flash-latest
 OPENROUTER_API_KEY=your_openrouter_api_key_here
+OPENROUTER_EVALUATOR_MODEL=nvidia/nemotron-3-super-120b-a12b:free
 ```
 
 Run GROBID locally before step 1:
@@ -107,6 +112,12 @@ To test the configured free model list with one gap each:
 .venv/bin/python src/5_test_openrouter_models.py --model free-list --limit 1
 ```
 
+To evaluate one saved reconstruction with Gemini and OpenRouter:
+
+```bash
+.venv/bin/python src/6_evaluate_reconstructions.py --limit 1
+```
+
 ## Outputs
 
 Methodology extraction outputs:
@@ -133,4 +144,10 @@ OpenRouter test outputs:
 
 ```text
 results/openrouter_tests/
+```
+
+Evaluation outputs:
+
+```text
+results/evaluations/
 ```
