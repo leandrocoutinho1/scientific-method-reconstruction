@@ -22,6 +22,7 @@ data/pypdf_output/*
 data/methods_extracted/*
 data/gaps/*
 results/reconstructions/*
+results/reconstructions_gemma/*
 results/openrouter_tests/*
 results/evaluations/*
 
@@ -33,6 +34,8 @@ results/evaluations/*
 !results/.gitkeep
 !results/reconstructions/
 !results/reconstructions/.gitkeep
+!results/reconstructions_gemma/
+!results/reconstructions_gemma/.gitkeep
 !results/openrouter_tests/
 !results/openrouter_tests/.gitkeep
 !results/evaluations/

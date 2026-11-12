@@ -10,6 +10,7 @@ from urllib.request import Request, urlopen
 from pydantic import ValidationError
 
 from llm_response_schema import validate_reconstruction_response
+from runtime_summary import print_runtime_summary, start_timer
 
 try:
     from dotenv import load_dotenv
@@ -282,6 +283,7 @@ def parse_args():
 
 
 def main():
+    start_time = start_timer()
     load_dotenv()
     args = parse_args()
     model = args.model or os.getenv("gemini-model") or os.getenv("GEMINI_MODEL", DEFAULT_MODEL)
@@ -297,14 +299,31 @@ def main():
         print(f"No gap files found in {args.input_dir}.")
         return
 
+    reconstructions_saved = 0
+    errors = 0
+
     for gap_file in gap_files:
-        with gap_file.open("r", encoding="utf-8") as input_file:
-            gap_data = json.load(input_file)
+        try:
+            with gap_file.open("r", encoding="utf-8") as input_file:
+                gap_data = json.load(input_file)
 
-        result = reconstruct_gap(api_key, model, gap_data)
-        output_path = save_reconstruction(args.output_dir, gap_file, result)
+            result = reconstruct_gap(api_key, model, gap_data)
+            output_path = save_reconstruction(args.output_dir, gap_file, result)
+            reconstructions_saved += 1
 
-        print(f"{gap_file.name}: reconstruction saved to {output_path}")
+            print(f"{gap_file.name}: reconstruction saved to {output_path}")
+        except Exception as exc:
+            errors += 1
+            print(f"{gap_file.name}: error reconstructing gap: {exc}")
+
+    print_runtime_summary(
+        start_time=start_time,
+        total_items=len(gap_files),
+        processed_items=reconstructions_saved,
+        errors=errors,
+        item_label="gaps",
+    )
+    print("Finished reconstructing gaps with Gemini.")
 
 
 if __name__ == "__main__":

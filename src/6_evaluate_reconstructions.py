@@ -11,6 +11,7 @@ from urllib.request import Request, urlopen
 from pydantic import ValidationError
 
 from llm_response_schema import validate_evaluation_response
+from runtime_summary import print_runtime_summary, start_timer
 
 try:
     from dotenv import load_dotenv
@@ -20,6 +21,7 @@ except ImportError:
 
 GAPS_DIR = Path("data/gaps")
 GEMINI_RECONSTRUCTIONS_DIR = Path("results/reconstructions")
+GEMMA_RECONSTRUCTIONS_DIR = Path("results/reconstructions_gemma")
 OPENROUTER_RECONSTRUCTIONS_DIR = Path("results/openrouter_tests")
 OUTPUT_DIR = Path("results/evaluations")
 
@@ -105,18 +107,42 @@ def load_gap_index(gaps_dir: Path) -> dict[str, dict]:
     return gap_index
 
 
-def load_reconstruction_files(
+def load_reconstruction_records(
     gemini_dir: Path,
+    gemma_dir: Path,
     openrouter_dir: Path,
     limit: Optional[int],
-) -> list[Path]:
+) -> list[tuple[Path, dict]]:
     reconstruction_files = sorted(gemini_dir.glob("*_reconstruction.json"))
+    reconstruction_files.extend(sorted(gemma_dir.glob("*/*_reconstruction.json")))
     reconstruction_files.extend(sorted(openrouter_dir.glob("*/*_reconstruction.json")))
 
-    if limit is not None:
-        return reconstruction_files[:limit]
+    reconstruction_records = [
+        (reconstruction_file, load_json(reconstruction_file))
+        for reconstruction_file in reconstruction_files
+    ]
 
-    return reconstruction_files
+    selected_gap_ids = []
+
+    for _, reconstruction_data in reconstruction_records:
+        gap_id = reconstruction_data.get("gap_id")
+        if gap_id not in selected_gap_ids:
+            selected_gap_ids.append(gap_id)
+
+        if limit is not None and len(selected_gap_ids) >= limit:
+            break
+
+    if limit is None:
+        return reconstruction_records
+
+    selected_gap_id_set = set(selected_gap_ids)
+    selected_records = [
+        (reconstruction_file, reconstruction_data)
+        for reconstruction_file, reconstruction_data in reconstruction_records
+        if reconstruction_data.get("gap_id") in selected_gap_id_set
+    ]
+
+    return selected_records
 
 
 def build_user_prompt(gap_data: dict, reconstruction_data: dict) -> str:
@@ -325,7 +351,15 @@ def save_evaluation(
     reconstruction_file: Path,
     result: dict,
 ) -> Path:
-    evaluator_dir = output_dir / safe_name(evaluator_provider) / safe_name(evaluator_model)
+    reconstruction_provider = result.get("reconstruction_provider", "unknown")
+    reconstruction_model = result.get("reconstruction_model", "unknown")
+    evaluator_dir = (
+        output_dir
+        / safe_name(evaluator_provider)
+        / safe_name(evaluator_model)
+        / safe_name(reconstruction_provider)
+        / safe_name(reconstruction_model)
+    )
     output_path = evaluator_dir / f"{reconstruction_file.stem}_evaluation.json"
     save_json(output_path, result)
     return output_path
@@ -338,7 +372,12 @@ def save_error(
     reconstruction_file: Path,
     error: Exception,
 ) -> Path:
-    evaluator_dir = output_dir / safe_name(evaluator_provider) / safe_name(evaluator_model)
+    evaluator_dir = (
+        output_dir
+        / safe_name(evaluator_provider)
+        / safe_name(evaluator_model)
+        / safe_name(reconstruction_file.parent.name)
+    )
     output_path = evaluator_dir / f"{reconstruction_file.stem}_evaluation_error.json"
     save_json(
         output_path,
@@ -367,6 +406,12 @@ def parse_args():
         type=Path,
         default=GEMINI_RECONSTRUCTIONS_DIR,
         help=f"Directory containing Gemini reconstructions. Default: {GEMINI_RECONSTRUCTIONS_DIR}.",
+    )
+    parser.add_argument(
+        "--gemma-reconstructions-dir",
+        type=Path,
+        default=GEMMA_RECONSTRUCTIONS_DIR,
+        help=f"Directory containing Gemma reconstructions. Default: {GEMMA_RECONSTRUCTIONS_DIR}.",
     )
     parser.add_argument(
         "--openrouter-reconstructions-dir",
@@ -403,23 +448,28 @@ def parse_args():
         "--limit",
         type=int,
         default=1,
-        help="Maximum number of reconstruction files to evaluate. Default: 1.",
+        help=(
+            "Maximum number of gaps to evaluate. All reconstructions found for "
+            "each selected gap will be evaluated. Default: 1."
+        ),
     )
     return parser.parse_args()
 
 
 def main():
+    start_time = start_timer()
     load_dotenv()
     args = parse_args()
 
     gap_index = load_gap_index(args.gaps_dir)
-    reconstruction_files = load_reconstruction_files(
+    reconstruction_records = load_reconstruction_records(
         args.gemini_reconstructions_dir,
+        args.gemma_reconstructions_dir,
         args.openrouter_reconstructions_dir,
         args.limit,
     )
 
-    if not reconstruction_files:
+    if not reconstruction_records:
         print("No reconstruction files found.")
         return
 
@@ -446,13 +496,19 @@ def main():
     if args.provider in {"both", "openrouter"} and not openrouter_api_key:
         raise ValueError("OPENROUTER_API_KEY not found. Add it to your .env file.")
 
-    for reconstruction_file in reconstruction_files:
-        reconstruction_data = load_json(reconstruction_file)
+    evaluator_count = 2 if args.provider == "both" else 1
+    total_attempts = len(reconstruction_records) * evaluator_count
+    evaluations_saved = 0
+    errors = 0
+    skipped = 0
+
+    for reconstruction_file, reconstruction_data in reconstruction_records:
         gap_id = reconstruction_data.get("gap_id")
         gap_data = gap_index.get(gap_id)
 
         if gap_data is None:
             print(f"{reconstruction_file}: skipped, gap_id not found in {args.gaps_dir}.")
+            skipped += evaluator_count
             continue
 
         prompt = build_user_prompt(gap_data, reconstruction_data)
@@ -474,8 +530,10 @@ def main():
                     reconstruction_file,
                     result,
                 )
+                evaluations_saved += 1
                 print(f"gemini: {reconstruction_file.name}: saved to {output_path}")
             except Exception as exc:
+                errors += 1
                 output_path = save_error(
                     args.output_dir,
                     "gemini",
@@ -502,8 +560,10 @@ def main():
                     reconstruction_file,
                     result,
                 )
+                evaluations_saved += 1
                 print(f"openrouter: {reconstruction_file.name}: saved to {output_path}")
             except Exception as exc:
+                errors += 1
                 output_path = save_error(
                     args.output_dir,
                     "openrouter",
@@ -512,6 +572,16 @@ def main():
                     exc,
                 )
                 print(f"openrouter: {reconstruction_file.name}: error saved to {output_path}")
+
+    print_runtime_summary(
+        start_time=start_time,
+        total_items=total_attempts,
+        processed_items=evaluations_saved,
+        errors=errors,
+        skipped=skipped,
+        item_label="attempts",
+    )
+    print("Finished evaluating reconstructions.")
 
 
 if __name__ == "__main__":

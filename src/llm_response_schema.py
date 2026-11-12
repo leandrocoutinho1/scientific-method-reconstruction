@@ -1,6 +1,22 @@
+import re
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 MISSING_TOKEN = "[MISSING_TEXT]"
+MIN_RECONSTRUCTION_WORDS = 8
+PLACEHOLDER_RESPONSES = {
+    "...",
+    "n/a",
+    "na",
+    "none",
+    "null",
+    "unknown",
+    "not available",
+    "not enough context",
+    "insufficient context",
+    "cannot determine",
+    "unable to determine",
+}
 
 
 class ReconstructionResponse(BaseModel):
@@ -12,9 +28,19 @@ class ReconstructionResponse(BaseModel):
     @classmethod
     def validate_reconstructed_excerpt(cls, value: str) -> str:
         cleaned = " ".join(value.split())
+        normalized = cleaned.strip().lower().rstrip(".")
 
         if not cleaned:
             raise ValueError("reconstructed_excerpt cannot be empty")
+
+        if normalized in PLACEHOLDER_RESPONSES:
+            raise ValueError("reconstructed_excerpt cannot be a placeholder response")
+
+        word_count = len(re.findall(r"\b\w+\b", cleaned, flags=re.UNICODE))
+        if word_count < MIN_RECONSTRUCTION_WORDS:
+            raise ValueError(
+                f"reconstructed_excerpt must contain at least {MIN_RECONSTRUCTION_WORDS} words"
+            )
 
         if MISSING_TOKEN in cleaned:
             raise ValueError("reconstructed_excerpt cannot contain the missing text marker")

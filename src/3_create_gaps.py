@@ -4,6 +4,8 @@ import re
 from argparse import ArgumentParser
 from pathlib import Path
 
+from runtime_summary import print_runtime_summary, start_timer
+
 INPUT_DIR = Path("data/methods_extracted")
 OUTPUT_DIR = Path("data/gaps")
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -119,6 +121,7 @@ def parse_args():
 
 
 def main():
+    start_time = start_timer()
     args = parse_args()
 
     if args.gaps_per_document < 1:
@@ -134,72 +137,102 @@ def main():
     for old_output in OUTPUT_DIR.glob("*.json"):
         old_output.unlink()
 
-    for json_file in INPUT_DIR.glob("*.json"):
-        with json_file.open("r", encoding="utf-8") as file:
-            content = json.load(file)
+    input_files = sorted(INPUT_DIR.glob("*.json"))
+    documents_processed = 0
+    documents_skipped = 0
+    errors = 0
 
-        paragraphs = content.get("paragraphs_clean", [])
-        document_record = {
-            "method_source_file": json_file.name,
-            "title": content.get("title_clean", ""),
-            "status": "processed",
-            "gaps_created": [],
-            "skip_reason": None,
-        }
+    for json_file in input_files:
+        try:
+            with json_file.open("r", encoding="utf-8") as file:
+                content = json.load(file)
 
-        if not paragraphs:
-            print(f"Skipping {json_file.name}: no clean methodology paragraphs found.")
-            document_record["status"] = "skipped"
-            document_record["skip_reason"] = "no clean methodology paragraphs found"
-            manifest["documents"].append(document_record)
-            continue
-
-        used_indexes = set()
-
-        for gap_index in range(args.gaps_per_document):
-            gap_data = create_paragraph_gap(paragraphs, used_indexes, rng)
-
-            if gap_data is None:
-                if gap_index == 0:
-                    print(f"Skipping {json_file.name}: no suitable paragraph to remove.")
-                    document_record["status"] = "skipped"
-                    document_record["skip_reason"] = "no suitable paragraph to remove"
-                break
-
-            output_filename = build_output_filename(
-                json_file,
-                gap_index,
-                args.gaps_per_document,
-            )
-            output_path = OUTPUT_DIR / output_filename
-            gap_id = output_path.stem
-
-            output = {
-                "gap_id": gap_id,
+            paragraphs = content.get("paragraphs_clean", [])
+            document_record = {
+                "method_source_file": json_file.name,
                 "title": content.get("title_clean", ""),
-                **gap_data,
+                "status": "processed",
+                "gaps_created": [],
+                "skip_reason": None,
             }
 
-            with output_path.open("w", encoding="utf-8") as output_file:
-                json.dump(output, output_file, ensure_ascii=False, indent=2)
+            if not paragraphs:
+                print(f"Skipping {json_file.name}: no clean methodology paragraphs found.")
+                document_record["status"] = "skipped"
+                document_record["skip_reason"] = "no clean methodology paragraphs found"
+                manifest["documents"].append(document_record)
+                documents_skipped += 1
+                continue
 
-            document_record["gaps_created"].append({
-                "gap_id": gap_id,
-                "output_file": output_filename,
+            used_indexes = set()
+
+            for gap_index in range(args.gaps_per_document):
+                gap_data = create_paragraph_gap(paragraphs, used_indexes, rng)
+
+                if gap_data is None:
+                    if gap_index == 0:
+                        print(f"Skipping {json_file.name}: no suitable paragraph to remove.")
+                        document_record["status"] = "skipped"
+                        document_record["skip_reason"] = "no suitable paragraph to remove"
+                        documents_skipped += 1
+                    break
+
+                output_filename = build_output_filename(
+                    json_file,
+                    gap_index,
+                    args.gaps_per_document,
+                )
+                output_path = OUTPUT_DIR / output_filename
+                gap_id = output_path.stem
+
+                output = {
+                    "gap_id": gap_id,
+                    "title": content.get("title_clean", ""),
+                    **gap_data,
+                }
+
+                with output_path.open("w", encoding="utf-8") as output_file:
+                    json.dump(output, output_file, ensure_ascii=False, indent=2)
+
+                document_record["gaps_created"].append({
+                    "gap_id": gap_id,
+                    "output_file": output_filename,
+                })
+
+                print(
+                    f"Gap created for {json_file.name}: "
+                    f"removed section '{gap_data['removed_section']}'"
+                )
+
+            if document_record["gaps_created"]:
+                documents_processed += 1
+
+            manifest["documents"].append(document_record)
+        except Exception as exc:
+            errors += 1
+            print(f"{json_file.name}: error creating gap: {exc}")
+            manifest["documents"].append({
+                "method_source_file": json_file.name,
+                "title": "",
+                "status": "error",
+                "gaps_created": [],
+                "skip_reason": str(exc),
             })
-
-            print(
-                f"Gap created for {json_file.name}: "
-                f"removed section '{gap_data['removed_section']}'"
-            )
-
-        manifest["documents"].append(document_record)
 
     manifest_path = OUTPUT_DIR / "manifest.json"
     with manifest_path.open("w", encoding="utf-8") as manifest_file:
         json.dump(manifest, manifest_file, ensure_ascii=False, indent=2)
 
     print(f"Gap creation manifest saved to {manifest_path}.")
+    print_runtime_summary(
+        start_time=start_time,
+        total_items=len(input_files),
+        processed_items=documents_processed,
+        errors=errors,
+        skipped=documents_skipped,
+        item_label="documents",
+    )
+    print("Finished creating artificial gaps.")
 
 
 if __name__ == "__main__":

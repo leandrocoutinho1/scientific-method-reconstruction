@@ -11,6 +11,7 @@ from urllib.request import Request, urlopen
 from pydantic import ValidationError
 
 from llm_response_schema import validate_reconstruction_response
+from runtime_summary import print_runtime_summary, start_timer
 
 try:
     from dotenv import load_dotenv
@@ -395,6 +396,7 @@ def parse_args():
 
 
 def main():
+    start_time = start_timer()
     load_dotenv()
     args = parse_args()
 
@@ -410,6 +412,9 @@ def main():
         return
 
     models = resolve_models(args.model)
+    total_attempts = len(models) * len(gap_files)
+    reconstructions_saved = 0
+    errors = 0
 
     for model in models:
         for gap_file in gap_files:
@@ -419,10 +424,21 @@ def main():
             try:
                 result = reconstruct_gap(api_key, model, gap_data, args.reasoning)
                 output_path = save_result(args.output_dir, model, gap_file, result)
+                reconstructions_saved += 1
                 print(f"{model}: {gap_file.name}: saved to {output_path}")
             except Exception as exc:
+                errors += 1
                 output_path = save_error(args.output_dir, model, gap_file, exc)
                 print(f"{model}: {gap_file.name}: error saved to {output_path}")
+
+    print_runtime_summary(
+        start_time=start_time,
+        total_items=total_attempts,
+        processed_items=reconstructions_saved,
+        errors=errors,
+        item_label="attempts",
+    )
+    print("Finished testing OpenRouter reconstructions.")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,8 @@
+{
+  "gap_id": "A-novel-method-for-the-modeling-of-the-state-of-health-of-li_2021_Knowledge-_methods_gap",
+  "title": "Knowledge-Based Systems",
+  "removed_excerpt": "This chapter includes a description of the method implemented for conducting LIB aging tests (Section 3.1), presents the algorithm for the procedure during the reference capacity measurements (Section 3.2) and presents the methods used for data pre-processing and statistical analysis (Section 3.3).",
+  "provider": "ollama",
+  "model": "qwen3:14b",
+  "reconstructed_excerpt": "The experimental procedure was divided into three main stages: preparation of the test cells, execution of the aging tests, and analysis of the obtained data. The first stage involved the selection and preparation of the 18650 lithium-ion cells, including their initial characterization and calibration. The second stage focused on the execution of the aging tests under various operational conditions, as described in detail in the following paragraphs. The third stage involved the processing and statistical analysis of the collected data to determine the impact of the cyclic operation parameters on the degradation of the LIBs."
+}

@@ -579,6 +579,10 @@ Foi adicionada uma validação com Pydantic para as respostas dos modelos de lin
 
 Foi criado o passo `src/6_evaluate_reconstructions.py` para avaliar a assertividade das reconstruções já geradas. Nesta etapa, o trecho original removido é usado como referência e a reconstrução é avaliada por dois julgadores: Gemini e um modelo configurável via OpenRouter. A resposta dos avaliadores também é validada com Pydantic e salva em `results/evaluations/`, contendo notas de 1 a 5 para aderência semântica, adequação metodológica, coerência com o contexto, risco de alucinação e nota geral. A decisão por usar dois avaliadores permite comparar se os modelos concordam sobre a qualidade das reconstruções antes de avançar para uma avaliação mais formal.
 
+### Registro — 2026-10-02 — Teste Experimental com Gemma
+
+Foram criados os passos experimentais `src/4_1_reconstruct_with_gemma_31b.py` e `src/4_2_reconstruct_with_gemma_26b.py` para testar modelos Gemma 4 pela Gemini API. A mudança ocorreu após o teste com `gemini-3.8-live` indicar que esse modelo Live não aceita saída textual (`TEXT`) no formato necessário para o projeto. Como a reconstrução precisa retornar JSON textual validável, o experimento passou a usar Gemma no endpoint tradicional `generateContent`, salvando os resultados em `results/reconstructions_gemma/`. A documentação oficial da Gemini API lista `gemma-4-31b-it` e `gemma-4-26b-a4b-it` como modelos Gemma 4 disponíveis para esse tipo de uso. O objetivo é comparar as reconstruções dos dois modelos antes de decidir se Gemma pode substituir ou complementar Gemini e OpenRouter.
+
 ## Decisões de Organização do Código
 
 Os scripts executáveis do pipeline foram numerados para facilitar a ordem de uso:
@@ -588,6 +592,8 @@ Os scripts executáveis do pipeline foram numerados para facilitar a ordem de us
 2_extract_method_sections.py
 3_create_gaps.py
 4_reconstruct_with_gemini.py
+4_1_reconstruct_with_gemma_31b.py
+4_2_reconstruct_with_gemma_26b.py
 5_test_openrouter_models.py
 6_evaluate_reconstructions.py
 ```
@@ -616,3 +622,81 @@ Este documento deve ser atualizado sempre que houver mudança relevante no rumo 
 - mudança no formato dos arquivos intermediários;
 - problemas encontrados durante testes com PDFs reais;
 - decisões tomadas para simplificar ou expandir o escopo.
+
+## 2026-10-16 — Reconstrução local com Ollama
+
+Adicionado o script experimental `4_3_reconstruct_with_ollama.py`, com Qwen3 8B
+como padrão, para comparar inferência local com os provedores externos sem
+substituir os scripts existentes. A motivação é reduzir dependência de quotas
+e indisponibilidade das APIs e medir a qualidade e o tempo no hardware local.
+
+Preservados o prompt, contexto completo e comprimento-alvo da reconstrução dos
+scripts Gemma, assim como a validação compartilhada. O trecho original continua
+reservado à comparação; apenas sua contagem de palavras orienta o comprimento.
+Ollama recebe JSON Schema, `think: false`, temperatura 0,2 e contexto de 8192 tokens.
+Respostas inválidas recebem uma tentativa adicional; erros são salvos por gap.
+As saídas ficam separadas em `results/reconstructions_ollama/<modelo>/`.
+A integração dessas saídas com o avaliador da etapa 6 permanece futura.
+
+## 2026-10-16 — Correção de subseções metodológicas omitidas
+
+A comparação do artigo sobre baterias com a saída do GROBID mostrou que
+`Cycling procedure`, `Capacity reference test` e `Cycle-life non-parametric model`
+estavam disponíveis na etapa 1, mas não eram selecionadas pela etapa 2.
+Esses três títulos foram adicionados aos padrões configuráveis, mantendo a
+abordagem por regras e os filtros existentes. A extração desse artigo passou de
+37 para 75 blocos. Isso corrige as omissões identificadas, sem garantir que toda
+a metodologia do corpus esteja completa.
+
+A metodologia e o contexto do gap desse artigo foram atualizados preservando
+`gap_id` e `removed_excerpt`, para repetir a comparação sobre a mesma lacuna.
+Não foram regenerados os gaps dos demais artigos nem as reconstruções antigas.
+As reconstruções e avaliações já salvas para baterias correspondem ao contexto
+anterior e devem ser identificadas como tal ao comparar rodadas. A seleção por
+título ainda pode manter resultados discutidos dentro de seções metodológicas.
+
+## 2026-10-16 — Controle do prompt local e comprimento
+
+Após o Qwen3 14B gerar 95 palavras para um trecho original de 42, o prompt do
+script 4.3 passou a enfatizar a função local da lacuna e proibir criação de
+etapas, calibrações e referências não sustentadas pelo contexto. Adicionada
+faixa de comprimento de aproximadamente 75% a 125% do alvo anterior (limitado
+a 20–60 palavras), usando contagem por espaços. Para o caso de baterias, a
+faixa é 31–53 palavras. Respostas fora da faixa recebem uma tentativa de
+correção com o erro explícito; nova falha gera arquivo de erro.
+
+A regra é exclusiva do experimento Ollama e não prova fidelidade semântica.
+Os resultados seguintes devem ser tratados como nova condição de prompt,
+sem atribuir diferenças apenas ao modelo. Não houve inferência nesta alteração.
+
+## 2026-11-12 — Consolidação dos testes locais e próximo estudo de prompts
+
+Registro retrospectivo da rodada salva em `results/ollama_prompt_v2/qwen3__14b/`:
+o trecho de estudantes passou a ter 24 palavras (original: 26) e mencionar
+grupamentos sobrepostos, mas não recuperou explicitamente as características
+acadêmicas e comportamentais. O trecho de baterias teve 42 palavras (original:
+42), omitiu a medição de capacidade de referência e manteve preparação de células
+como etapa, ausente no trecho de referência. Trata-se de leitura qualitativa de
+dois casos, sem avaliação cega ou evidência para generalização. A restrição de
+comprimento funcionou; não assegurou recuperação do conteúdo original.
+
+O próximo estudo proposto manterá Qwen3 14B local e comparará três condições:
+prompt simples, prompt estruturado e prompt detalhado com tags e instruções.
+A escolha local reduz dependência de quotas e custos por chamada, mas envolve
+hardware, energia e tempo. Maior preço não será tratado como garantia de melhor
+qualidade: os testes realizados não controlaram custos nem permitem estabelecer
+essa relação. Também não se presume que serviços pagos adicionem tags internas
+ou que modelos abertos exijam tags; isso não foi demonstrado no projeto.
+
+A comparação deverá manter gaps, contexto, modelo, quantização e parâmetros
+iguais, versionar prompts e salvar rodadas separadas. Tags são delimitadores
+textuais; o estudo comparará estratégias completas de prompt, sem atribuir
+isoladamente às tags o efeito de instruções adicionais. Fidelidade, omissões,
+invenções, falhas e tempo devem ser examinados. Os dois exemplos usados no
+ajuste dos prompts são casos de desenvolvimento; a avaliação deverá incluir
+outros gaps. Nenhuma das três condições foi implementada nesta consolidação.
+
+Os JSONs locais disponíveis e `tempo.txt` foram preservados neste checkpoint.
+São registros parciais de rodadas diferentes; os tempos não constituem benchmark
+controlado. PDFs e saídas intermediárias continuam fora do versionamento conforme
+as regras existentes, portanto este checkpoint não contém o corpus completo.

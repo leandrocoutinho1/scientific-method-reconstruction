@@ -9,6 +9,7 @@ from text_cleaning import (
     is_probably_table_or_figure,
     normalize_for_matching,
 )
+from runtime_summary import print_runtime_summary, start_timer
 
 INPUT_DIR = Path("data/grobid_output")
 OUTPUT_DIR = Path("data/methods_extracted")
@@ -197,29 +198,43 @@ def load_input_files(input_dir: Path, limit: Optional[int]) -> list[Path]:
 
 
 def main():
+    start_time = start_timer()
     args = parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     for old_output in args.output_dir.glob("*.json"):
         old_output.unlink()
 
+    input_files = load_input_files(args.input_dir, args.limit)
     files_processed = 0
+    errors = 0
 
-    for json_path in load_input_files(args.input_dir, args.limit):
-        extracted = extract_method_text(json_path)
-        output_path = args.output_dir / f"{json_path.stem}_methods.json"
+    for json_path in input_files:
+        try:
+            extracted = extract_method_text(json_path)
+            output_path = args.output_dir / f"{json_path.stem}_methods.json"
 
-        with output_path.open("w", encoding="utf-8") as file:
-            json.dump(extracted, file, ensure_ascii=False, indent=2)
+            with output_path.open("w", encoding="utf-8") as file:
+                json.dump(extracted, file, ensure_ascii=False, indent=2)
 
-        files_processed += 1
+            files_processed += 1
 
-        print(
-            f"{json_path.name}: "
-            f"{extracted['num_paragraphs']} methodology blocks extracted"
-        )
+            print(
+                f"{json_path.name}: "
+                f"{extracted['num_paragraphs']} methodology blocks extracted"
+            )
+        except Exception as exc:
+            errors += 1
+            print(f"{json_path.name}: error extracting methodology blocks: {exc}")
 
-    print(f"Finished processing {files_processed} files.")
+    print_runtime_summary(
+        start_time=start_time,
+        total_items=len(input_files),
+        processed_items=files_processed,
+        errors=errors,
+        item_label="files",
+    )
+    print("Finished extracting methodology sections.")
 
 
 if __name__ == "__main__":

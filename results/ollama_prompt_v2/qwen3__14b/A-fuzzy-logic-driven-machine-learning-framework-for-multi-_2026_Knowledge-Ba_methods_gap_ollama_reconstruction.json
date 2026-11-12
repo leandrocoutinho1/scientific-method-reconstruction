@@ -1,0 +1,8 @@
+{
+  "gap_id": "A-fuzzy-logic-driven-machine-learning-framework-for-multi-_2026_Knowledge-Ba_methods_gap",
+  "title": "Knowledge-Based Systems",
+  "removed_excerpt": "Using FCM, students are clustered based on similarities in their academic and behavioral characteristics, effectively capturing the uncertainty and overlap commonly observed in real-world educational data.",
+  "provider": "ollama",
+  "model": "qwen3:14b",
+  "reconstructed_excerpt": "Initially, the FCM algorithm is applied to the dataset to partition students into overlapping clusters based on their performance metrics and other relevant features."
+}

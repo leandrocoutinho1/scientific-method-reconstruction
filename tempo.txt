@@ -1,0 +1,71 @@
+Passo 1: GROBID
+Errors: 0 out of 10 files processed
+⏱️  Total runtime: 49.93 seconds
+🚀 Speed: 0.20 documents/second
+ Throughput: 4.99 seconds/document
+Finished processing PDFs with GROBID.
+
+
+Passo 2: Seções Metodológicas
+Errors: 0 out of 10 files
+⏱️  Total runtime: 1.42 seconds
+🚀 Speed: 7.05 files/second
+   Throughput: 0.14 seconds/file
+Finished extracting methodology sections.
+
+
+Passo 3: Gaps
+Errors: 0 out of 10 documents
+⏱️  Total runtime: 0.02 seconds
+🚀 Speed: 497.66 documents/second
+   Throughput: 0.00 seconds/document
+Finished creating artificial gaps.
+
+Passo 4: Recontrução Gemini - gemini-flash-latest
+Processing completed: 1 out of 2 gaps processed
+Errors: 1 out of 2 gaps
+⏱️  Total runtime: 44.19 seconds
+🚀 Speed: 0.02 gaps/second
+   Throughput: 44.19 seconds/gap
+Finished reconstructing gaps with Gemini.
+
+Passo 4.1: Recontrução Gemini - gemma-4-31b-it
+Processing completed: 2 out of 2 gaps processed
+Errors: 0 out of 2 gaps
+⏱️  Total runtime: 118.97 seconds
+🚀 Speed: 0.02 gaps/second
+   Throughput: 59.49 seconds/gap
+Finished reconstructing gaps with gemma-4-31b-it.
+
+Passo 4.2: Recontrução Gemini - gemma-4-26b-a4b-it
+Processing completed: 1 out of 2 gaps processed
+Errors: 1 out of 2 gaps
+⏱️  Total runtime: 186.90 seconds
+🚀 Speed: 0.01 gaps/second
+   Throughput: 186.90 seconds/gap
+Finished reconstructing gaps with gemma-4-26b-a4b-it.
+
+Passo 4.2: Recontrução Ollama
+Processing completed: 2 out of 2 gaps processed
+Errors: 0 out of 2 gaps
+⏱️  Total runtime: 20.28 seconds
+🚀 Speed: 0.10 gaps/second
+   Throughput: 10.14 seconds/gap
+Finished reconstructing gaps with qwen3:14b.
+
+Passo 5: Recontrução OpenRouter
+Processing completed: 2 out of 2 attempts processed
+Errors: 0 out of 2 attempts
+⏱️  Total runtime: 3.64 seconds
+🚀 Speed: 0.55 attempts/second
+   Throughput: 1.82 seconds/attempt
+Finished testing OpenRouter reconstructions.
+
+Passo 5: Avaliar Recontruções
+Processing completed: 6 out of 8 attempts processed
+Errors: 2 out of 8 attempts
+⏱️  Total runtime: 93.01 seconds
+🚀 Speed: 0.06 attempts/second
+   Throughput: 15.50 seconds/attempt
+Finished evaluating reconstructions.
+
